@@ -1,35 +1,70 @@
 const express = require("express")
 const db = require("./db")
+const bcr = require("bcryptjs")
 const app = express()
-
+const SECRET = "dfgdgf"
+const jwt = require("jsonwebtoken")
 app.use(express.json())
-
-app.get("/", (req, res) => {
-    res
-        .status(200)
-        .json({ message: "Hello world" })
-})
 
 app.get("/users", (req, res) => {
     const users = db.prepare("SELECT * FROM users").all()
+    console.log(users);
+    
     return res.status(200).json(users)
 })
 
-app.post("/users", (req, res) => {
-    const { email, name } = req.body
+app.get("/", (req, res) => {
+    res.status(200).json({ message: "Bye dreem" })
+})
+
+app.post("/auth/signup", (req, res) => {
+    const { email, name, password } = req.body
     try {
-        if (!email || !name)
+        if (!email || !name || !password)
             return res
                 .status(400)
-                .json({ error: "Не хватает данных" })
-        const query = db
-            .prepare(`INSERT INTO users (name, email) VALUES (?, ?)`).run(name, email)
-        const newUser = db
-            .prepare("SELECT * FROM users WHERE id = ?").get(query.lastInsertRowid)
-        res.status(200).json(newUser)
+                .json({ error: "Не хватает папы" })
+            const syncSalt = bcr.genSaltSync(10)
+            const hashed = bcr.hashSync(password, syncSalt)
+        const query = db.prepare(`INSERT INTO users (name, email, password) VALUES (?, ?, ?)`).run(name, email, hashed)
+        const newUser = db.prepare("SELECT * FROM users WHERE id  = ?").get(query.lastInsertRowid)
+        const {password: _, ...safeUser} = newUser
+        res.status(201).json(safeUser)
     } catch (error) {
         console.error(error)
         res.status(500).json({error: "Что-то пошло не так"})
+    }
+})
+
+app.delete("/users/:id", (req, res) => {
+    const {id} = req.params
+
+    try{
+        const query = db.prepare("DELETE FROM users WHERE id = ?").run(id)
+        if (query.changes == 0) {
+            return res.status(404).json({error: "э а где гей"})
+        }
+        return res.status(200).json({message: "лол"})
+    } catch (error) {
+        console.error(error)
+        return res.status(500).json({messages: "что-то пошло не так"})
+    }
+})
+
+app.post("/auth/signin", (res, req) => {
+    try{
+        const {email, password} = req.body
+        if (!email || !password) {
+            return res.status(400).json({error: "я не вижу че там написано"})
+        }
+        const user = dp.prepare("SELECT * FROM users WHERE email = ?").get(email)
+        if(!user) return res.status(401).json({error: "ты накосячил гдетол"})
+        const hashed = bcr.compareSync(password, user.password)
+        if (!hashed) return res.status(401).json({error: "не правильго"})
+        const {password: _, safeUser} = user
+        const token = jwt.sign(safeUser, SECRET, {expiresIn: "24h"})
+    }   catch (error) {
+        
     }
 })
 
